@@ -1,0 +1,26 @@
+{
+  "name": "nelfe",
+  "version": "1.0.0",
+  "description": "Node-Express Library Front End, a web UI for accessing locally hosted movies, music, and ebooks.",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kzaremski/nelfe.git"
+  },
+  "author": "Konstantin Zaremski",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kzaremski/nelfe/issues"
+  },
+  "homepage": "https://github.com/kzaremski/nelfe#readme",
+  "dependencies": {
+    "bcrypt": "^5.0.1",
+    "dotenv": "^16.0.0",
+    "express": "^4.17.2",
+    "nunjucks": "^3.2.3",
+    "sqlite3": "^5.0.2"
+  }
+}
