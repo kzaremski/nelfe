@@ -14,7 +14,8 @@ const bcrypt = require('bcrypt');
 
 // DB namespace
 let db = {};
-db.prepared = false;
+db['user'] = {};
+db['settings'] = {};
 
 /**
  * Database connection function, accepts the database path as a string and returns an sqlite3 database object
@@ -58,6 +59,57 @@ async function hashPassword(password) {
       if (err) reject(err);
       resolve(hash);
     });
+  });
+}
+
+/**
+ * Compare a user-inputted password to a hashed password and return a boolean value.
+ * @param {String} password String of raw user input password to be compared
+ * @param {String} hashed String of hashed password
+ * @returns A boolean, true for correct passwords, false for incorrect passwords or other errors
+ */
+async function comparePassword(password, hashed) {
+  return new Promise(function(resolve, reject) {
+      bcrypt.compare(password, hashed, function(err, res) {
+          if (err) {
+               reject(false);
+          } else {
+               resolve(true);
+          }
+      });
+  });
+}
+
+/**
+ * Escapes potentiall dangerous characters with backslashes, to be used in SQL statements.
+ * @param {String} str Input string
+ * @returns String with all characters that are potentially dangerous to SQL escaped with backslashes
+ */
+function mysql_real_escape_string (str) {
+  if (typeof str != 'string')
+      return str;
+
+  return str.replace(/[\0\x08\x09\x1a\n\r"'\\\%]/g, function (char) {
+      switch (char) {
+          case "\0":
+              return "\\0";
+          case "\x08":
+              return "\\b";
+          case "\x09":
+              return "\\t";
+          case "\x1a":
+              return "\\z";
+          case "\n":
+              return "\\n";
+          case "\r":
+              return "\\r";
+          case "\"":
+          case "'":
+          case "\\":
+          case "%":
+              return "\\"+char; // prepends a backslash to backslash, percent,
+                                // and double/single quotes
+      }
   });
 }
 
@@ -152,9 +204,36 @@ db.createDefaults = async function() {
 }
 
 /**
+ * 
+ * @param {String} username Username
+ * @param {String} password 
+ */
+db.user.authenticate = async function(username, password) {
+  return new Promise((resolve, reject) => {
+    // Select all from Users table with the passed username
+    const accounts = await dbPromiseExecSQL(
+      conn,
+      `SELECT * FROM Users WHERE AccountName='${mysql_real_escape_string(username)}';`
+    );
+    // If there is one row returned then the account exists
+    const accountExists = (accounts.length === 1);
+    if (!accountExists) reject(1); // If the account does not exist, reject with error code 1
+    // User account object from the single row returned by the database
+    const account = accounts[0];
+    try {
+      // Hash the user-inputted password and compare that hash against the one in the account
+      await comparePassword(password, account.Passowrd); 
+    } catch {
+      reject(2); // Password is incorrect, response code 2
+    }
+    resolve(0); // User exists and password is correct, response code 0
+  });
+}
+
+/**
  * Get all system/app settings from the database and return them as a JSON
  */
-db.getSettings = async function() {
+db.settings.get = async function() {
   // Connect to the database
   let conn = dbConnect(`${__dirname}/nelfe.db`);
   let settings = {};
