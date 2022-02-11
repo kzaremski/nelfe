@@ -204,9 +204,10 @@ db.createDefaults = async function() {
 }
 
 /**
- * 
- * @param {String} username Username
- * @param {String} password 
+ * Authenticate a user based on their username and password from form input.
+ * @param {String} username Username from form input
+ * @param {String} password Password from form input
+ * @returns {Number} Returns an error code based on the response and issues, zero for success
  */
 db.user.authenticate = async function(username, password) {
   return new Promise((resolve, reject) => {
