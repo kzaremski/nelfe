@@ -10,6 +10,7 @@
 
 // Require dependencies
 const sqlite3 = require('sqlite3').verbose();
+const bcrypt = require('bcrypt');
 
 // DB namespace
 let db = {};
@@ -46,11 +47,37 @@ function dbPromiseExecSQL(database, query) {
 }
 
 /**
+ * Hash a password with bcrypt, returns a new Promise.
+ * @param {*} password Unhashed, raw password from user input
+ * @returns {String} Hashed password
+ */
+async function hashPassword(password) {
+  return new Promise((resolve, reject) => {
+    // Use the bcrypt library to hash the password, 
+    bcrypt.hash(password, 10, function(err, hash) {
+      if (err) reject(err);
+      resolve(hash);
+    });
+  });
+}
+
+/**
+ * Format a JavaScript date object as an SQL DATE or DATETIME
+ * @param {Date} date Input JavaScript Date object/class
+ * @param {Boolean} isDATETIME Should the time be added to make the formatted date an SQL DATETIME (YYYY-MM-DD HH:MI:SS)
+ */
+function formatDateSQL(date, isDATETIME) {
+  let SQLDate = date.toISOString().slice(0, 10); // YYYY-MM-DD
+  if (isDATETIME) SQLDate += date.toISOString().slice(10, 19).replace('T', ' '); // HH:MI:SS
+  return SQLDate;
+}
+
+/**
  * This function creates tables in the database for user accounts, settings, etc. and populates them with default values for a fresh installation.
  * 
  * TABLES:
- * - USERS
- * - SETTINGS
+ * - USERS (AccountID, AccountName, Password, DisplayName, IsAdmin, IsDisabled, Created, LastLogin)
+ * - SETTINGS (Key, Value, Type)
  * 
  * The default user account u:p admin:admin
  */
@@ -69,15 +96,37 @@ db.createDefaults = async function() {
       conn,
       `CREATE TABLE if not exists Users (AccountID INT,
                                          AccountName VARCHAR(50),
-                                         PasswordHash VARCHAR(4096),
+                                         Password VARCHAR(4096),
                                          DisplayName VARCHAR(50),
                                          IsAdmin BOOL,
                                          IsDisabled BOOL,
                                          Created DATE,
                                          LastLogin DATETIME);`
     );
+    console.log('   DONE!');
     // After the table has been created, populate it with a generic admin user account
-
+    console.log('Creating the initial admin user used for access...');
+    console.log('   Username:Password - admin:admin');
+    await dbPromiseExecSQL(
+      conn,
+      `INSERT INTO Users (AccountID,
+                          AccountName,
+                          Password,
+                          DisplayName,
+                          IsAdmin,
+                          IsDisabled,
+                          Created,
+                          LastLogin)
+                  VALUES (0,
+                          'admin',
+                          '${await hashPassword('admin')}',
+                          'Admin',
+                          TRUE,
+                          FALSE,
+                          '${formatDateSQL(new Date(), false)}',
+                          '${formatDateSQL(new Date(0), true)}');`
+    );
+    console.log('   DONE!');
   }
   // Check to see if the settings table already exists, determined by the results returning rows
   const settingsTableExists = ((await dbPromiseExecSQL(
@@ -86,7 +135,7 @@ db.createDefaults = async function() {
   )).length > 0);
   // Create user accounts table if it does not already exist
   if (!settingsTableExists) {
-    console.log('Users database table does not exist, creating...');
+    console.log('Settings database table does not exist, creating...');
     await dbPromiseExecSQL(
       conn,
       `CREATE TABLE if not exists Settings (Key VARCHAR(50),
@@ -95,6 +144,7 @@ db.createDefaults = async function() {
     );
     // After the table has been created, populate it with the default values/settings
     await dbPromiseExecSQL(conn, `INSERT INTO Settings VALUES('LISTEN_PORT', '3080', 'number');`);
+    console.log('   DONE!');
   }
   // Close the database connection
   conn.close((err) => { if (err) console.log(err.message) });

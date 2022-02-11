@@ -11,26 +11,21 @@
 // Require dependencies
 const express = require('express');
 
+// Constants/flags
+const LISTEN_PORT = process.env.PORT || 3000;
+
 // Database controller
 const db = require('./db.js');
+// Create default tables if they do not already exist
+db.createDefaults();
 
 // Express App Object
 const app = express();
 
 app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
+  res.send('Hello World!');
+});
 
-// Prepare
-async function prepare() {
-  // Create default database tables with all of their values if they do not already exist
-  await db.createDefaults();
-  // Set settings based on the settings database table
-  let LISTEN_PORT = await db.getSettings()['LISTEN_PORT'];
-  // Listen for HTTP requests
-  app.listen(LISTEN_PORT, () => {
-    console.log(`Example app listening on port ${LISTEN_PORT}`);
-  });
-}
-
-prepare();
+app.listen(LISTEN_PORT, () => {
+  console.log(`NELFE web endpoint listening on port ${LISTEN_PORT}`);
+});
