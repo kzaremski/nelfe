@@ -17,16 +17,17 @@
  */
 
 // Require dependencies
-const db = require('./db.js');
+const path = require('path');
+const db = require(path.join(__dirname, 'db.js'));
 const fs = require('fs');
 
 // Build the media library in the database
 async function parse(rootPath) {
-  try {
-    await fs.promises.access(rootPath);
-
-  } catch(err) {
-    db.log(`[LIBRARIAN] ${String(err)}`, 'error');
+  // Try to access the root path passed to the function
+  try { await fs.promises.access(rootPath) } catch {
+    // If the fs library can not access the path, do nothing and display the error
+    db.log(`[LIBRARIAN] Unable to access "${rootPath}", new library will not be parsed.`, 'error');
+    return false;
   }
 }
 
