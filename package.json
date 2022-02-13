@@ -22,8 +22,12 @@
     "dotenv": "^16.0.0",
     "express": "^4.17.2",
     "express-session": "^1.17.2",
+    "node-cron": "^3.0.0",
     "nunjucks": "^3.2.3",
     "path": "^0.12.7",
     "sqlite3": "^5.0.2"
+  },
+  "devDependencies": {
+    "bootstrap": "^5.1.3"
   }
 }

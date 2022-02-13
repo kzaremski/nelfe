@@ -8,17 +8,19 @@
  * auth.js - Authentication handler/router.
  */
 
+const e = require('express');
 const express = require('express');
 const router = express.Router();
 
 // Login front end
-router.get('/login', (req, res) => {
+router.get('/', (req, res) => {
   if (req.session.username) req.redirect('/');
 });
 
 // Login server actions
-router.post('/login', (req, res) => {
-  res.send('Login');
+router.post('/login', async (req, res) => {
+  let response = { code: 500 };
+  res.send(JSON.stringify(response));
 });
 
 // Logout

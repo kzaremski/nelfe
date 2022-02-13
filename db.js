@@ -2,14 +2,15 @@
  * nelfe (Node-Express Library Front End)
  *   A web based portal/front end for consuming locally stored movies, music, and ebooks.
  * 
- * Licensed under the MIT license. 
  * Konstantin Zaremski - 6 February 2022
+ * See LICENSE.
  * 
  * db.js - Database controller file. Database connection and repetetive operations are performed 
  */
 
 // Require dependencies
 const sqlite3 = require('sqlite3').verbose();
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 
 // DB namespace
@@ -24,11 +25,12 @@ db['settings'] = {};
  */
 function dbConnect(databasePath) {
   return new sqlite3.Database(databasePath,
-    sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE
-    , (err) => {
+    sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE,
+    (err) => {
       // If there is an error, output it to the console
       if (err) return console.error(err.message);
-    });
+    }
+  );
 }
 
 /**
@@ -52,7 +54,7 @@ function dbPromiseExecSQL(database, query) {
  * @param {*} password Unhashed, raw password from user input
  * @returns {String} Hashed password
  */
-async function hashPassword(password) {
+function hashPassword(password) {
   return new Promise((resolve, reject) => {
     // Use the bcrypt library to hash the password, 
     bcrypt.hash(password, 10, function(err, hash) {
@@ -68,7 +70,7 @@ async function hashPassword(password) {
  * @param {String} hashed String of hashed password
  * @returns A boolean, true for correct passwords, false for incorrect passwords or other errors
  */
-async function comparePassword(password, hashed) {
+function comparePassword(password, hashed) {
   return new Promise(function(resolve, reject) {
       bcrypt.compare(password, hashed, function(err, res) {
           if (err) {
@@ -86,9 +88,7 @@ async function comparePassword(password, hashed) {
  * @returns String with all characters that are potentially dangerous to SQL escaped with backslashes
  */
 function mysql_real_escape_string (str) {
-  if (typeof str != 'string')
-      return str;
-
+  if (typeof str != 'string') return str; // If the inputted value is not a string, just return that value
   return str.replace(/[\0\x08\x09\x1a\n\r"'\\\%]/g, function (char) {
       switch (char) {
           case "\0":
@@ -103,12 +103,12 @@ function mysql_real_escape_string (str) {
               return "\\n";
           case "\r":
               return "\\r";
-          case "\"":
-          case "'":
-          case "\\":
-          case "%":
-              return "\\"+char; // prepends a backslash to backslash, percent,
-                                // and double/single quotes
+          case "\"": // Fall through to case "%"
+          case "'":  // Fall through to case "%"
+          case "\\": // Fall through to case "%"
+          case "%":  // Fall through to case "%"
+              return "\\" + char; // prepends a backslash to backslash, percent,
+                                  // and double/single quotes
       }
   });
 }
@@ -198,9 +198,82 @@ db.createDefaults = async function() {
     await dbPromiseExecSQL(conn, `INSERT INTO Settings VALUES('LISTEN_PORT', '3080', 'number');`);
     console.log('   DONE!');
   }
+  // Check to see if the Logs table already exists, determined by the results returning rows
+  const logTableExists = ((await dbPromiseExecSQL(
+    conn,
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='Log';`
+  )).length > 0);
+  if (!logTableExists) {
+    console.log('Log database table does not exist, creating...');
+    await dbPromiseExecSQL(
+      conn,
+      `CREATE TABLE if not exists Logs (UUID VARCHAR(128),
+                                        DateTime DATETIME,
+                                        Level VARCHAR(16),
+                                        Message VARCHAR(4096));`
+    );
+    console.log('   DONE!');
+  }
   // Close the database connection
   conn.close((err) => { if (err) console.log(err.message) });
   return true;
+}
+
+/**
+ * Write a log entry to the log database
+ * @param {String} message The message to be logged
+ * @param {String} level The type or level of message to log, default: INFO
+ * @param {Boolean} suppressOutput True: do not console.log or console.error the message
+ */
+db.log = async function (message, level, suppressOutput) {
+  try {
+    if (!message) return console.error('Error (db.log): Log message can not be undefined');
+    const logLevels = ['DEBUG', 'INFO', 'WARNING', 'ERROR'];
+    if (!level) level = 'INFO'; // If no log level is provided, default to INFO
+    // If the supplied log level is not a valid log level, default to INFO
+    if (!logLevels.includes(level.toUpperCase())) {
+      level = 'INFO';
+      console.error('Error (db.log): Supplied log level is not valid, defaulting to "INFO"');
+    }
+    // Connect to the database
+    let conn = dbConnect(`${__dirname}/nelfe.db`);
+    const logDate = new Date();
+    // Insert the log in to the database
+    await dbPromiseExecSQL(
+      conn,
+      `INSERT INTO Logs (UUID,
+                         DateTime,
+                         Level,
+                         Message)
+                 VALUES ('${crypto.randomUUID()}',
+                         '${formatDateSQL(logDate, true)}',
+                         '${level.toUpperCase()}',
+                         '${mysql_real_escape_string(message)}');`
+    );
+    // If the console output is not suppressed, console
+    if (!suppressOutput) {
+      // Create a friendly output for the console that includes the same DateTime
+      const consoleOutput = `[${formatDateSQL(logDate, true)}]${message}`;
+      // Different console output types based on the log level
+      switch (level.toUpperCase()) {
+        case 'DEBUG':
+          console.debug(consoleOutput);
+        case 'INFO':
+          console.log(consoleOutput);
+        case 'WARNING':
+          console.warn(consoleOutput);
+        case 'ERROR':
+          console.error(consoleOutput);
+        default:
+          console.log(consoleOutput);
+      }
+    }
+    // Close the database connection
+    conn.close((err) => { if (err) console.log(err.message) });
+    return true;
+  } catch(err) {
+    return console.error(`Error: ${err}`);
+  }
 }
 
 /**
@@ -219,7 +292,7 @@ db.user.authenticate = async function(username, password) {
     // If there is one row returned then the account exists
     const accountExists = (accounts.length === 1);
     if (!accountExists) reject(1); // If the account does not exist, reject with error code 1
-    // User account object from the single row returned by the database
+    // Select the account object from the single row returned by the database
     const account = accounts[0];
     try {
       // Hash the user-inputted password and compare that hash against the one in the account
@@ -259,7 +332,7 @@ db.settings.get = async function() {
   // Close the database connection
   conn.close((err) => { if (err) console.log(err.message) });
   // Return the settings object
-  console.log(settings)
+  console.log(settings);
   return settings;
 }
 
@@ -268,7 +341,7 @@ db.settings.get = async function() {
  * @param {Object} settings Settings object. Object keys correspond to the setting_key in the database.
  */
 db.saveSettings = async function(settings) {
-  return;
+  return true;
 }
 
 

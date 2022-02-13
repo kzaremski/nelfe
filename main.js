@@ -2,8 +2,8 @@
  * nelfe (Node-Express Library Front End)
  *   A web based portal/front end for consuming locally stored movies, music, and ebooks.
  * 
- * Licensed under the MIT license. 
  * Konstantin Zaremski - 6 February 2022
+ * See LICENSE.
  * 
  * main.js - Main server file.
  */
@@ -13,10 +13,11 @@ const express = require('express');
 const session = require('express-session');
 const nunjucks = require('nunjucks');
 const crypto = require('crypto');
-const fs = require('fs');
+const cron = require('node-cron');
+const path = require('path');
 
 // Database controller
-const db = require('./db.js');
+const db = require(path.join(__dirname, 'db.js'));
 require('dotenv').config();
 
 // Express App Object
@@ -46,7 +47,7 @@ app.use('/static', express.static(path.join(__dirname, 'static')));
 // Define essential routes
 app.get('/', (req, res) => {
   if (!req.session.username) req.redirect('/auth');
-  res.send('');
+  res.render('app.html');
 });
 
 // Authentication router (/auth)(auth.js)
@@ -58,7 +59,9 @@ async function prepare() {
   await db.createDefaults();
   // Parse all the media in the library folder
   if (!process.env.LIBRARY_ROOT) return console.error('The library root (LIBRARY_ROOT) is not defined in the configuration file, no libary will be built. Please fix ./config.env');
-  await buildLibaray(process.env.LIBRARY_ROOT);
+  await librarian.parse(process.env.LIBRARY_ROOT);
+  // After the first parse is complete, schedule the database to be updated every 30 minutes
+  cron.schedule('0 */30 * * * *', () => { librarian.parse(process.env.LIBRARY_ROOT) });
 }; prepare(); // Execute
 
 // Listen for HTTP requests on the configured HTTP_PORT
