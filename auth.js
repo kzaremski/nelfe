@@ -13,7 +13,7 @@ const router = express.Router();
 
 // Login front end
 router.get('/login', (req, res) => {
-  res.send('Login FE');
+  if (req.session.username) req.redirect('/');
 });
 
 // Login server actions
@@ -23,7 +23,10 @@ router.post('/login', (req, res) => {
 
 // Logout
 router.get('/logout', (req, res) => {
-  res.send('About birds');
+  // Destroy the req.session object and then redirect the user back to the root
+  req.session.destroy(function(err) {
+    req.redirect('/');
+  });
 });
 
-module.exports = router
+module.exports = router;

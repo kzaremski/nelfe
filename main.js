@@ -10,6 +10,8 @@
 
 // Require dependencies
 const express = require('express');
+const session = require('express-session');
+const crypto = require('crypto');
 const fs = require('fs');
 
 // Database controller
@@ -18,10 +20,18 @@ require('dotenv').config();
 
 // Express App Object
 const app = express();
+// Session management/support (express-session)
+app.use(session({
+  secret: crypto.randomUUID(), // Random secret on every run
+  cookie: {
+    secure: (app.get('env') === 'production')
+  }
+}));
 
 // Define essential routes
 app.get('/', (req, res) => {
-  res.send('Hello World!');
+  if (!req.session.username) req.redirect('/auth');
+  res.send('');
 });
 
 // Authentication router (/auth)(auth.js)
@@ -34,7 +44,7 @@ async function prepare() {
   // Parse all the media in the library folder
   if (!process.env.LIBRARY_ROOT) return console.error('The library root (LIBRARY_ROOT) is not defined in the configuration file, no libary will be built. Please fix ./config.env');
   await buildLibaray(process.env.LIBRARY_ROOT);
-}; prepare();
+}; prepare(); // Execute
 
 // Listen for HTTP requests on the configured HTTP_PORT
 // If the port is not configured, use port 8080
