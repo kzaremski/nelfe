@@ -11,6 +11,7 @@
 // Require dependencies
 const express = require('express');
 const session = require('express-session');
+const nunjucks = require('nunjucks');
 const crypto = require('crypto');
 const fs = require('fs');
 
@@ -27,6 +28,20 @@ app.use(session({
     secure: (app.get('env') === 'production')
   }
 }));
+// Parse JSON-encoded request bodies
+app.use(express.json());
+
+// Configure nunjucks
+nunjucks.configure('views', {
+  noCache: true,
+  watch: true,
+  autoescape: true,
+  express: app
+});
+app.set('views', path.join(__dirname, 'views'));
+
+// Static files
+app.use('/static', express.static(path.join(__dirname, 'static')));
 
 // Define essential routes
 app.get('/', (req, res) => {
