@@ -201,10 +201,10 @@ db.createDefaults = async function() {
   // Check to see if the Logs table already exists, determined by the results returning rows
   const logTableExists = ((await dbPromiseExecSQL(
     conn,
-    `SELECT name FROM sqlite_master WHERE type='table' AND name='Log';`
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='Logs';`
   )).length > 0);
   if (!logTableExists) {
-    console.log('Log database table does not exist, creating...');
+    console.log('Logs database table does not exist, creating...');
     await dbPromiseExecSQL(
       conn,
       `CREATE TABLE if not exists Logs (UUID VARCHAR(128),
