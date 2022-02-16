@@ -306,6 +306,7 @@ db.user.authenticate = async function(username, password) {
 
 /**
  * Get all system/app settings from the database and return them as a JSON
+ * @returns {Object} All settings key/values
  */
 db.settings.get = async function() {
   // Connect to the database
@@ -320,12 +321,19 @@ db.settings.get = async function() {
     switch (setting.Type) {
       case 'string':
         parsedValue = String(setting.Value);
+        break;
       case 'number':
-        parsedValue = parseInt(setting.Value);
+        parsedValue = Setting.value.includes('.') ? parseFloat(setting.Value) : parseInt(setting.Value);
+        break;
       case 'date':
         parsedValue = new Date(setting.Value);
+        break;
       case 'object':
         parsedValue = JSON.parse(setting.Value);
+        break;
+      default:
+        parsedValue = String(setting.Value);
+        break;
     }
     settings[setting.Key] = parsedValue;
   });
@@ -337,11 +345,56 @@ db.settings.get = async function() {
 }
 
 /**
- * 
+ * Save the key value pairs passed to the function in the database
  * @param {Object} settings Settings object. Object keys correspond to the setting_key in the database.
  */
-db.saveSettings = async function(settings) {
-  return true;
+db.settings.save = async function(settings) {
+  // If there are no settings passed to save, return and do nothing
+  if (Object.keys(settings).length === 0) return false;
+  // Connect to the database
+  let conn = dbConnect(`${__dirname}/nelfe.db`);
+  // For each entrie (key/value pair) in the provided settings object
+  for (const [key, value] of Object.entries(settings)) {
+    // Variables synonymous to those in SQL
+    const Key = key;
+    let Value;
+    let Type;
+    // Set the type and format the value
+    switch (typeof value) {
+      case 'string':
+        Value = mysql_real_escape_string(value);
+        Type = 'string';
+        break;
+      case 'number':
+        Value = String(value);
+        Type = 'number';
+        break;
+      case 'object':
+        // Dates will also have the typeof as object
+        if (value instanceof Date) {
+          // If the value is a JS date then the type is a date
+          Value = value.toUTCString();
+          Type = 'date';
+        } else {
+          // Otherwise stringify and store as JSON
+          Value = mysql_real_escape_string(JSON.stringify(value));
+          Type = 'object';
+        };
+        break;
+      default:
+        // Other types will be stored as strings
+        Value = String(mysql_real_escape_string(value));
+        Type = 'string';
+        break;
+    }
+    // Replace into in order to either add or replace existing rows in the database
+    await dbPromiseExecSQL(
+      conn,
+      `REPLACE INTO Settings (Key, Value, Type) values('${Key}', '${Value}', '${Type}');`
+    );
+  }
+  // Close the database connection
+  conn.close((err) => { if (err) console.log(err.message) });
 }
 
 
