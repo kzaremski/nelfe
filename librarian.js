@@ -22,6 +22,14 @@ const path = require('path');
 const db = require(path.join(__dirname, 'db.js'));
 const fs = require('fs');
 
+// File types
+const fileExtensions = {
+  movie: ['mkv', 'mp4', 'mov', 'avi'],
+  music: ['mp3', 'wav', 'wav'],
+  books: ['epub', 'pdf'],
+  photo: ['jpg', 'jpeg', 'png'] 
+}
+
 // Build the media library in the database
 async function parse(rootPath) {
   // Try to access the root path passed to the function
@@ -68,16 +76,16 @@ async function parse(rootPath) {
   // Read in the contents of the directories
   let mediaContents = {};
   if (moviePath) mediaContents['movie'] = await fs.promises.readdir(moviePath);
-  if (musicPath) mediaContents['music']  = await fs.promises.readdir(musicPath);
+  if (musicPath) mediaContents['music'] = await fs.promises.readdir(musicPath);
   if (photoPath) mediaContents['photo'] = await fs.promises.readdir(photoPath);
   if (bookPath ) mediaContents['book']  = await fs.promises.readdir(bookPath);
   
   // Traverse the contents of each of the media directories
-  for (const [mediaType, mediaDirectory] of mediaContents) {
+  for (const [mediaType, mediaDirectory] of Object.entries(mediaContents)) {
     mediaDirectory.forEach(item => {
       // If it is a directory (usually there will be metadata and supporting imagery in the directory)
       if (item.isDirectory()) {
-        
+
       // If it is a singular file
       } else {
   
